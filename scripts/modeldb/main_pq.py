@@ -47,9 +47,8 @@ if __name__ == "__main__":
 
     if args.opq:
         raise NotImplementedError("OPQ is not implemented for GPU yet.")
-    if args.merged_training is False:
-        raise NotImplementedError("Only merged training is supported😈. Use --merged_training")
-    
+    # if args.merged_training is False:
+    #     raise NotImplementedError("Only merged training is supported😈. Use --merged_training")
     # ================== Config ==================
     config = UniConfig()
     config.device = 'cuda' # TODO: support multi-gpu
@@ -199,8 +198,12 @@ if __name__ == "__main__":
     if "evaluation" in config.pipeline:
         if config.dataset == '_synthetic':
             tprint("Using synthetic centroids for speed evaluation")
-            key_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
-            val_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+            if config.merged_training is True:
+                key_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+                val_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+            else:
+                key_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+                val_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
         else:
             key_cent = torch.load(config.cent_root / f'key_cent_{config.M}_{config.nbits}.pq.pt', weights_only=True)
             key_cent = key_cent.to(config.device).to(model.dtype)
@@ -257,6 +260,7 @@ if __name__ == "__main__":
             nbits=config.nbits,
             d=config.d,
             scalar_t=config.scalar_t,
+            merged_training=config.merged_training,
         )
         cache.set_cent(key_cent, val_cent)
     

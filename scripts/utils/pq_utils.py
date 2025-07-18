@@ -96,7 +96,7 @@ class KernelRegistry:
         return flash_decoding
 
 class DynamicPQCache(metaclass=Singleton):
-    def __init__(self, *, bs, nh, num_key_value_heads, M, layer_num, dtype=torch.uint8, nbits=8, d=128, scalar_t=torch.float32):
+    def __init__(self, *, bs, nh, num_key_value_heads, M, layer_num, dtype=torch.uint8, nbits=8, d=128, scalar_t=torch.float32, merged_training=False):
         self.bs = bs
         self.nh = nh
         self.num_key_value_heads = num_key_value_heads
@@ -106,6 +106,7 @@ class DynamicPQCache(metaclass=Singleton):
         self.nbits = nbits
         self.d = d
         self.scalar_t = scalar_t
+        self.merged_training = merged_training
 
         self.max_residual_length = d # Common practice: Lt = d to make residual cache square so kernel is easy to implement
         self.registery = KernelRegistry(M=M, d=d, nbits=nbits, nh=nh, scalar_t=scalar_t)
@@ -147,8 +148,18 @@ class DynamicPQCache(metaclass=Singleton):
 
     def set_cent(self, key_cent, value_cent):
         """
-        cent is of shape (M, c, d//M)
+        cent is of shape (M, c, d//M) if merged_training=True
+        or (layer_num, M, c, d//M) if merged_training=False
         """
+        if self.merged_training is False:
+            layer_num, M, c, d_m = key_cent.shape
+            assert layer_num == self.layer_num, f"layer_num {layer_num} does not match self.layer_num {self.layer_num}"
+        else:
+            M, c, d_m = key_cent.shape
+        assert key_cent.shape == value_cent.shape, "key_cent and value_cent must have the same shape"
+        assert d_m * M == self.d, f"d_m * M {d_m * M} must equal to d {self.d}"
+        assert c == 2 ** self.nbits, f"c {c} must equal to 2 ** nbits {2 ** self.nbits}"
+        
         if key_cent is value_cent:
             self._cent = key_cent.contiguous()
             self.key_cent = self._cent
@@ -172,7 +183,7 @@ class DynamicPQCache(metaclass=Singleton):
         
         # assert cent is set
         assert hasattr(self, 'key_cent') and hasattr(self, 'value_cent')
-
+    
         current_device = key_states.device
         past_length = self.key_cache[layer_idx].size(2)
 
@@ -182,23 +193,26 @@ class DynamicPQCache(metaclass=Singleton):
         self.value_cache[layer_idx] = self.value_cache[layer_idx].to(current_device)
         self.key_cent = self.key_cent.to(current_device)
         self.value_cent = self.value_cent.to(current_device)
+        
+        key_cent = self.key_cent if self.merged_training else self.key_cent[layer_idx]
+        value_cent = self.value_cent if self.merged_training else self.value_cent[layer_idx]
 
         if distort_recent:
-            key_codes = sa_encode_4d_keops(key_states, self.key_cent, target_dtype=self.dtype)
-            value_codes = sa_encode_4d_keops(value_states, self.value_cent, target_dtype=self.dtype)
+            key_codes = sa_encode_4d_keops(key_states, key_cent, target_dtype=self.dtype)
+            value_codes = sa_encode_4d_keops(value_states, value_cent, target_dtype=self.dtype)
             # self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_codes], dim=2)
             # self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_codes], dim=2)
             self.cat_codes(key_codes, value_codes, layer_idx)
 
-            key_states = sa_decode_4d(self.key_cache[layer_idx], self.key_cent)
-            value_states = sa_decode_4d(self.value_cache[layer_idx], self.value_cent)
+            key_states = sa_decode_4d(self.key_cache[layer_idx], key_cent)
+            value_states = sa_decode_4d(self.value_cache[layer_idx], value_cent)
         else:
             if past_length > 0:
-                past_key_states = sa_decode_4d(self.key_cache[layer_idx], self.key_cent)
-                past_value_states = sa_decode_4d(self.value_cache[layer_idx], self.value_cent)
+                past_key_states = sa_decode_4d(self.key_cache[layer_idx], key_cent)
+                past_value_states = sa_decode_4d(self.value_cache[layer_idx], value_cent)
 
-            key_codes = sa_encode_4d_keops(key_states, self.key_cent, target_dtype=self.dtype)
-            value_codes = sa_encode_4d_keops(value_states, self.value_cent, target_dtype=self.dtype)
+            key_codes = sa_encode_4d_keops(key_states, key_cent, target_dtype=self.dtype)
+            value_codes = sa_encode_4d_keops(value_states, value_cent, target_dtype=self.dtype)
             # self.key_cache[layer_idx] = torch.cat([self.key_cache[layer_idx], key_codes], dim=2)
             # self.value_cache[layer_idx] = torch.cat([self.value_cache[layer_idx], value_codes], dim=2)
             self.cat_codes(key_codes, value_codes, layer_idx)
@@ -219,10 +233,13 @@ class DynamicPQCache(metaclass=Singleton):
 
         TL;DR: Leave distort_recent=False when deploying models.
         """
+        key_cent = self.key_cent if self.merged_training else self.key_cent[layer_idx]
+        value_cent = self.value_cent if self.merged_training else self.value_cent[layer_idx]
+        
         with Timer("DynamicPQCache.prefill"):
             with Timer("DynamicPQCache.prefill.encode"):
-                key_codes = sa_encode_4d_keops(key_states, self.key_cent, target_dtype=self.dtype)
-                value_codes = sa_encode_4d_keops(value_states, self.value_cent, target_dtype=self.dtype)
+                key_codes = sa_encode_4d_keops(key_states, key_cent, target_dtype=self.dtype)
+                value_codes = sa_encode_4d_keops(value_states, value_cent, target_dtype=self.dtype)
                 torch.cuda.synchronize()
 
             with Timer("DynamicPQCache.prefill.cat"):
@@ -231,8 +248,8 @@ class DynamicPQCache(metaclass=Singleton):
 
             if distort_recent is True:
                 with Timer("DynamicPQCache.prefill.decode"):
-                    key_states = sa_decode_4d(key_codes, self.key_cent)
-                    value_states = sa_decode_4d(value_codes, self.value_cent)
+                    key_states = sa_decode_4d(key_codes, key_cent)
+                    value_states = sa_decode_4d(value_codes, value_cent)
                 torch.cuda.synchronize()
 
             with Timer("DynamicPQCache.prefill.attention"):
@@ -272,14 +289,16 @@ class DynamicPQCache(metaclass=Singleton):
         
         """
         breakdown = UniConfig().breakdown
+        key_cent = self.key_cent if self.merged_training else self.key_cent[layer_idx]
+        value_cent = self.value_cent if self.merged_training else self.value_cent[layer_idx]
 
         # flush residual to cache if needed
         r = self.residualed_tokens[layer_idx]
         if r == self.max_residual_length:
             with Timer("LlamaSdpaAttention.forward.flush"):
                 with Timer("LlamaSdpaAttention.forward.flush.encode"):
-                    key_codes = sa_encode_4d_keops(self.key_residual_cache[layer_idx], self.key_cent, target_dtype=self.dtype)
-                    value_codes = sa_encode_4d_keops(self.value_residual_cache[layer_idx], self.value_cent, target_dtype=self.dtype)
+                    key_codes = sa_encode_4d_keops(self.key_residual_cache[layer_idx], key_cent, target_dtype=self.dtype)
+                    value_codes = sa_encode_4d_keops(self.value_residual_cache[layer_idx], value_cent, target_dtype=self.dtype)
                     if breakdown is True: torch.cuda.synchronize()
 
                 with Timer("LlamaSdpaAttention.forward.flush.cat"):
@@ -306,8 +325,8 @@ class DynamicPQCache(metaclass=Singleton):
                 query_states,
                 self.key_cache[layer_idx],
                 self.value_cache[layer_idx],
-                self.key_cent,
-                self.value_cent,
+                key_cent,
+                value_cent,
                 self.key_residual_cache[layer_idx],
                 self.value_residual_cache[layer_idx],
                 self.residualed_tokens[layer_idx]
