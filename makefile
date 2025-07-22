@@ -3,15 +3,24 @@ bindings:
 	python3 setup.py install && \
 	cd ../../../../
 
-ppl:
+ppl_merged:
+	python3 -m scripts.modeldb.main_pq \
+	-f llama-2-7b.json \
+	--dataset wikitext-2-raw-v1 \
+	-M 32 \
+	--nbits 10 \
+	-m \
+	--half \
+	-p baseline sampling training evaluation
+
+ppl_non_merged:
 	python3 -m scripts.modeldb.main_pq \
 	-f llama-2-7b.json \
 	--dataset wikitext-2-raw-v1 \
 	-M 64 \
 	--nbits 8 \
-	-m \
 	--half \
-	-p baseline sampling training evaluation
+	-p sampling training evaluation
 
 e2e:
 	python3 -m scripts.modeldb.main_pq \
@@ -21,7 +30,7 @@ e2e:
 	--nbits 8 \
 	-m \
 	--half \
-	-p baseline evaluation
+	-p evaluation
 
 breakdown:
 	python3 -m scripts.modeldb.main_pq \

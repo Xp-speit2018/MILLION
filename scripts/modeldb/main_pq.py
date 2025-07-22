@@ -87,6 +87,13 @@ if __name__ == "__main__":
 
     config.opq = args.opq
     config.merged_training = args.merged_training
+    
+    if config.merged_training:
+        config.sample_root = config.sample_root / "merged"
+        config.cent_root = config.cent_root / "merged"
+    else:
+        config.sample_root = config.sample_root / "per_layer"
+        config.cent_root = config.cent_root / "per_layer"
 
     from transformers import AutoConfig
     from .models.ModelContext import get_context
@@ -129,19 +136,27 @@ if __name__ == "__main__":
     if "sampling" in config.pipeline and config.dataset != '_synthetic':
         tprint("Sampling")
 
-        key_sampled_path = config.sample_root / f'key_sampled_{config.M}_{config.nbits}.fvecs'
-        value_sampled_path = config.sample_root / f'value_sampled_{config.M}_{config.nbits}.fvecs'
-
-        if key_sampled_path.exists() or value_sampled_path.exists():
+        if config.sample_root.exists() is True:
             # ask for confirmation
-            tprint(f"Sampling files already exist at {key_sampled_path} or {value_sampled_path}")
-            tprint(f"Overwrite? (y/n)")
-            if input().lower() != 'y':
-                tprint("Exit")
-                exit()
-            else:
-                os.remove(key_sampled_path)
-                os.remove(value_sampled_path)
+            tprint(f"Sampling path already exist at {config.sample_root}")
+            
+            while True:
+                tprint("Clear the directory(c) or exit(e)? (c/e)")
+                char = input().strip().lower()
+                if char == 'e':
+                    tprint("Exiting...")
+                    exit()
+                elif char == 'c':
+                    tprint("Clearing the directory...")
+                    for file in config.sample_root.glob("*"):
+                        file.unlink()
+                    tprint("Directory cleared.")
+                    break
+            
+        else:
+            tprint(f"Creating sampling path at {config.sample_root}")
+            os.makedirs(config.sample_root, exist_ok=True)
+
 
         from .Errors import SamplingComplete
         from ..benchmarks import dataset2benchmark
@@ -168,27 +183,28 @@ if __name__ == "__main__":
 
         os.makedirs(config.cent_root, exist_ok=True)
 
-        key = read_fvecs(config.sample_root / f'key_sampled_{config.M}_{config.nbits}.fvecs')
-        if config.opq is False:
+        if config.merged_training is True:
+            key = read_fvecs(config.sample_root / f'key_sampled_{config.M}_{config.nbits}.fvecs')
             key_cent = train_pq(key, config.M, config.nbits)
             save(key_cent, config.cent_root / f'key_cent_{config.M}_{config.nbits}.pq.pt')
             del key, key_cent
-        else:
-            key_A, key_cent = train_opq(key, config.M, config.nbits)
-            save(key_A, config.cent_root / f'key_A_{config.M}_{config.nbits}.opq.pt')
-            save(key_cent, config.cent_root / f'key_cent_{config.M}_{config.nbits}.opq.pt')
-            del key, key_A, key_cent
 
-        val = read_fvecs(config.sample_root / f'value_sampled_{config.M}_{config.nbits}.fvecs')
-        if config.opq is False:
+
+            val = read_fvecs(config.sample_root / f'value_sampled_{config.M}_{config.nbits}.fvecs')
             val_cent = train_pq(val, config.M, config.nbits)
             save(val_cent, config.cent_root / f'val_cent_{config.M}_{config.nbits}.pq.pt')
             del val, val_cent
         else:
-            val_A, val_cent = train_opq(val, config.M, config.nbits)
-            save(val_A, config.cent_root / f'val_A_{config.M}_{config.nbits}.opq.pt')
-            save(val_cent, config.cent_root / f'val_cent_{config.M}_{config.nbits}.opq.pt')
-            del val, val_A, val_cent
+            for layer_idx in tqdm(range(config.model_config.num_hidden_layers), desc="Training PQ for each layer"):
+                key = read_fvecs(config.sample_root / f'key_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs')
+                key_cent = train_pq(key, config.M, config.nbits)
+                save(key_cent, config.cent_root / f'key_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt')
+                del key, key_cent
+
+                val = read_fvecs(config.sample_root / f'value_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs')
+                val_cent = train_pq(val, config.M, config.nbits)
+                save(val_cent, config.cent_root / f'val_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt')
+                del val, val_cent
 
     if "evaluation" not in config.pipeline:
         tprint("Exit")
@@ -205,49 +221,24 @@ if __name__ == "__main__":
                 key_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
                 val_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
         else:
-            key_cent = torch.load(config.cent_root / f'key_cent_{config.M}_{config.nbits}.pq.pt', weights_only=True)
-            key_cent = key_cent.to(config.device).to(model.dtype)
-            val_cent = torch.load(config.cent_root / f'val_cent_{config.M}_{config.nbits}.pq.pt', weights_only=True)
-            val_cent = val_cent.to(config.device).to(model.dtype)
+            if config.merged_training is True:
+                tprint("Using merged centroids")
+                key_cent = torch.load(config.cent_root / f'key_cent_{config.M}_{config.nbits}.pq.pt', weights_only=True)
+                key_cent = key_cent.to(config.device).to(model.dtype)
+                val_cent = torch.load(config.cent_root / f'val_cent_{config.M}_{config.nbits}.pq.pt', weights_only=True)
+                val_cent = val_cent.to(config.device).to(model.dtype)
+            else:
+                tprint("Using per-layer centroids")
+                key_cent = []
+                val_cent = []
+                for layer_idx in range(config.model_config.num_hidden_layers):
+                    key_cent.append(torch.load(config.cent_root / f'key_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt', weights_only=True))
+                    key_cent[-1] = key_cent[-1].to(config.device).to(model.dtype)
+                    val_cent.append(torch.load(config.cent_root / f'val_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt', weights_only=True))
+                    val_cent[-1] = val_cent[-1].to(config.device).to(model.dtype)
+                key_cent = torch.stack(key_cent, dim=0).contiguous()
+                val_cent = torch.stack(val_cent, dim=0).contiguous()
 
-            if config.opq is True:
-                tprint("OPQ patching model weights")
-                key_A = torch.load(config.cent_root / f'key_A_{config.M}_{config.nbits}.opq.pt', weights_only=True)
-                key_A = key_A.to(config.device).to(model.dtype)
-                val_A = torch.load(config.cent_root / f'val_A_{config.M}_{config.nbits}.opq.pt', weights_only=True)
-                val_A = val_A.to(config.device).to(model.dtype)
-
-                # # OPQ prepends Linear Transformation before PQ: 
-                # # key_codes = opq_encode(K) = pq_encode(K @ A.T) = pq_encode(X @ Wk.T @ A.T) = pq_encode(X @ (A @ Wk).T)
-
-                # # Insight: A @ Wk is a fixed transformation, so we can precompute it as new model weights to avoid online overhead
-
-                # # In practice: k_proj, v_proj are instances of nn.Linear
-                # # k_proj = x -> x @ Wk.T where k_proj.weight = Wk, sized (num_key_value_heads * head_dim, hidden_size)
-                # # We are assuming bias is not used in k_proj, v_proj. Fortunately this is generally true for most models.
-                # # Merged training uses the same opq for all heads, A.shape = (head_dim, head_dim). To apply A to all heads, 
-                # # we should fit A to diagonal blocks of (num_key_value_heads * head_dim, num_key_value_heads * head_dim) matrix
-
-                # head_dim = config.model_config.hidden_size // config.model_config.num_key_value_heads
-                # head_dim_sum = head_dim * config.model_config.num_key_value_heads
-                # key_A_expanded = torch.zeros(head_dim_sum, head_dim_sum, dtype=model.dtype, device=model.device)
-                # val_A_expanded = torch.zeros(head_dim_sum, head_dim_sum, dtype=model.dtype, device=model.device)
-                # for i in range(config.model_config.num_key_value_heads):
-                #     start = i * head_dim
-                #     end = start + head_dim
-                #     key_A_expanded[start:end, start:end] = key_A
-                #     val_A_expanded[start:end, start:end] = val_A
-
-                # # The following code is tuned for llama. For other models, we may need to change the component names.
-                # for layer in model.model.layers:
-                #     Wk = layer.self_attn.k_proj.weight.data
-                #     Wv = layer.self_attn.v_proj.weight.data
-                #     layer.self_attn.k_proj.weight = torch.nn.Parameter(key_A_expanded @ Wk)
-                #     layer.self_attn.v_proj.weight = torch.nn.Parameter(val_A_expanded @ Wv)
-                # del key_A_expanded, val_A_expanded
-
-                del key_A, val_A, 
-                torch.cuda.empty_cache()
 
         from ..utils.pq_utils import DynamicPQCache
         cache = DynamicPQCache(

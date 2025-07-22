@@ -67,20 +67,21 @@ def save_forward(
     import random 
     os.makedirs(root, exist_ok=True)
     from ...utils.fvecio import write_fvecs
+    if config.merged_training is True:
+        key_path = root / f'key_sampled_{config.M}_{config.nbits}.fvecs'
+        value_path = root / f'value_sampled_{config.M}_{config.nbits}.fvecs'
+    else:
+        key_path = root / f'key_sampled_{config.M}_{config.nbits}_layer{self.layer_idx}.fvecs'
+        value_path = root / f'value_sampled_{config.M}_{config.nbits}_layer{self.layer_idx}.fvecs'
+    
     for b in range(bs):
         for h in range(nh):
-            if random.random() > threshold:
-                continue
             key_ = key_states[b, h].view(-1, head_size).cpu().detach().numpy()
-            write_fvecs(config.sample_root / f'key_sampled_{config.M}_{config.nbits}.fvecs', key_, 'ab')
+            write_fvecs(key_path, key_, 'ab')
             del key_
             value_ = value_states[b, h].view(-1, head_size).cpu().detach().numpy()
-            write_fvecs(config.sample_root / f'value_sampled_{config.M}_{config.nbits}.fvecs', value_, 'ab')
+            write_fvecs(value_path, value_, 'ab')
             del value_
-            if self.layer_idx == 0: 
-                config.sampled_nums += 1
-            if config.sampled_nums > config.expected_sample_nums:
-                raise SamplingComplete(f"Sampled {config.sampled_nums} vectors, expected {config.expected_sample_nums}, stopping...")
 
     if past_key_value is not None:
         # sin and cos are specific to RoPE models; cache_position needed for the static cache
