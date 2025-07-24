@@ -3,10 +3,12 @@ import torch
 import random
 
 class Reservoir:
-    def __init__(self, max_size=100, device='cuda:0', dim=128, dtype=torch.float16, name=''):
+    def __init__(self, max_size=100, device='cpu', dim=128, dtype=torch.float16, name=''):
         self.name = name
         self.max_size = max_size
         self.reservoir = torch.zeros((max_size, dim), device=device, dtype=dtype)
+        self.device = device
+        self.dtype = dtype
         self.count = 0
         
     def __del__(self):
@@ -16,17 +18,16 @@ class Reservoir:
         
     def add(self, x):
         assert x.size(0) == 1
-        assert x.size(1) == self.reservoir.size(1)
+        assert x.size(1) == self.reservoir.size(1), f"Expected input dimension {self.reservoir.size(1)}, got {x.size(1)}"
         
         if self.count < self.max_size:
             self.reservoir[self.count] = x
+            self.count += 1
             
         else:
             idx = random.randint(0, self.count)
             if idx < self.max_size:
                 self.reservoir[idx] = x
-            
-        self.count += 1
 
     # def batch_add(self, xs):
     #     n = xs.size(0)
@@ -37,7 +38,7 @@ class Reservoir:
                
     def batch_add(self, xs):
         n = xs.size(0)
-        assert xs.size(1) == self.reservoir.size(1)
+        assert xs.size(1) == self.reservoir.size(1), f"Expected input dimension {self.reservoir.size(1)}, got {xs.size(1)}"
         
         # Remaining space in the reservoir
         remaining = self.max_size - self.count
@@ -71,5 +72,3 @@ class Reservoir:
             # Randomly select reservoir indices to replace
             reservoir_indices = torch.randint(0, self.max_size, (num_replace,), device=xs.device)
             self.reservoir[reservoir_indices] = selected_xs
-        
-        self.count += n

@@ -160,18 +160,68 @@ if __name__ == "__main__":
 
         from .Errors import SamplingComplete
         from ..benchmarks import dataset2benchmark
+        from ..utils.Reservoir import Reservoir
         benchmark = dataset2benchmark[config.dataset]
 
-        config.sampled_nums = 0
-        config.expected_sample_nums = 256 * 2**config.nbits
-        config.expected_vecs_per_sample = config.model_config.num_key_value_heads
-        config.threshold = 1 / config.expected_vecs_per_sample / 5
-
+        head_size = config.model_config.hidden_size // config.model_config.num_key_value_heads
+        if config.merged_training is True:
+            config.key_reservoir = Reservoir(
+                max_size = 256 * 2**config.nbits,
+                device = "cpu", # use CPU for reservoir to avoid GPU memory issues
+                dim = head_size,
+                dtype = model.dtype,
+                name = f"{config.model_name}_{config.dataset}_merged"
+            )
+            config.value_reservoir = Reservoir(
+                max_size = 256 * 2**config.nbits,
+                device = "cpu",
+                dim = head_size,
+                dtype = model.dtype,
+                name = f"{config.model_name}_{config.dataset}_merged"
+            )
+        else:
+            config.key_reservoir = [
+                Reservoir(
+                    max_size = 256 * 2**config.nbits,
+                    device = "cpu",
+                    dim = head_size,
+                    dtype = model.dtype,
+                    name = f"{config.model_name}_{config.dataset}_layer{layer_idx}"
+                ) for layer_idx in range(config.model_config.num_hidden_layers)
+            ]
+            config.value_reservoir = [
+                Reservoir(
+                    max_size = 256 * 2**config.nbits,
+                    device = "cpu",
+                    dim = head_size,
+                    dtype = model.dtype,
+                    name = f"{config.model_name}_{config.dataset}_layer{layer_idx}"
+                ) for layer_idx in range(config.model_config.num_hidden_layers)
+            ]
+                
         with config.context.sampling_context:
             try:
                 benchmark(model, tokenizer, **(config.to_dict()))
             except SamplingComplete as e:
                 tprint(e)
+                
+        # serialize reservoirs
+        from ..utils.fvecio import write_fvecs
+        os.makedirs(config.sample_root, exist_ok=True)
+        if config.merged_training is True:
+            key_reservoir_path = config.sample_root / f'key_sampled_{config.M}_{config.nbits}.fvecs'
+            value_reservoir_path = config.sample_root / f'value_sampled_{config.M}_{config.nbits}.fvecs'
+            write_fvecs(key_reservoir_path, config.key_reservoir.reservoir[:config.key_reservoir.count].cpu().numpy())
+            tprint(f"Reservoirs saved to {key_reservoir_path} and {value_reservoir_path}")
+            del config.key_reservoir, config.value_reservoir
+        else:
+            for layer_idx in range(config.model_config.num_hidden_layers):
+                key_reservoir_path = config.sample_root / f'key_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs'
+                value_reservoir_path = config.sample_root / f'value_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs'
+                write_fvecs(key_reservoir_path, config.key_reservoir[layer_idx].reservoir[:config.key_reservoir[layer_idx].count].cpu().numpy())
+                write_fvecs(value_reservoir_path, config.value_reservoir[layer_idx].reservoir[:config.value_reservoir[layer_idx].count].cpu().numpy())
+                tprint(f"Reservoirs saved to {key_reservoir_path} and {value_reservoir_path}")
+            # del config.key_reservoir, config.value_reservoir
 
     # ================== training ==================
     if "training" in config.pipeline and config.dataset != '_synthetic':

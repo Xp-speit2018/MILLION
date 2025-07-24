@@ -60,28 +60,15 @@ def save_forward(
     # save to disk
     bs, nh, _, head_size = key_states.shape
     config = UniConfig()
-    root = config.sample_root
-    threshold = config.threshold
-
-    import os
-    import random 
-    os.makedirs(root, exist_ok=True)
-    from ...utils.fvecio import write_fvecs
-    if config.merged_training is True:
-        key_path = root / f'key_sampled_{config.M}_{config.nbits}.fvecs'
-        value_path = root / f'value_sampled_{config.M}_{config.nbits}.fvecs'
-    else:
-        key_path = root / f'key_sampled_{config.M}_{config.nbits}_layer{self.layer_idx}.fvecs'
-        value_path = root / f'value_sampled_{config.M}_{config.nbits}_layer{self.layer_idx}.fvecs'
     
     for b in range(bs):
         for h in range(nh):
-            key_ = key_states[b, h].view(-1, head_size).cpu().detach().numpy()
-            write_fvecs(key_path, key_, 'ab')
-            del key_
-            value_ = value_states[b, h].view(-1, head_size).cpu().detach().numpy()
-            write_fvecs(value_path, value_, 'ab')
-            del value_
+            if config.merged_training is True:
+                config.key_reservoir.batch_add(key_states[b, h].view(-1, head_size).detach().cpu())
+                config.value_reservoir.batch_add(value_states[b, h].view(-1, head_size).detach().cpu())
+            else:
+                config.key_reservoir[self.layer_idx].batch_add(key_states[b, h].view(-1, head_size).detach().cpu())
+                config.value_reservoir[self.layer_idx].batch_add(value_states[b, h].view(-1, head_size).detach().cpu())
 
     if past_key_value is not None:
         # sin and cos are specific to RoPE models; cache_position needed for the static cache
