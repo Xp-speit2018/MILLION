@@ -1,3 +1,9 @@
+import warnings
+import logging
+warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("deepspeed").setLevel(logging.ERROR)
+
 import argparse
 import json
 import itertools
@@ -33,6 +39,11 @@ if __name__ == "__main__":
     parser.add_argument("--nbits", type=int, help="PQ config, number of bits per sub-section", required=True)
     parser.add_argument("--seed", type=int, help="Random seed", required=False, default=42)
     parser.add_argument("--save_dir", type=str, help="Directory to save the model", required=True)
+    parser.add_argument("--deepspeed", type=str, help="Path to deepspeed config file", required=True)
+    
+    # Add local_rank argument (required for DeepSpeed)
+    parser.add_argument("--local_rank", type=int, default=-1, 
+                       help="Local rank passed from distributed launcher")
 
     args = parser.parse_args()
     
@@ -55,8 +66,6 @@ if __name__ == "__main__":
         config.nbits = args.nbits
     if args.dataset is not None:
         config.dataset = args.dataset
-    if args.pipeline is not None:
-        config.pipeline = args.pipeline
     if args.seed is not None:
         config.seed = args.seed
 
@@ -78,10 +87,17 @@ if __name__ == "__main__":
     # ================== Load Model ==================
     tprint(f"Loading model {config.model_name}")
     from transformers import AutoModelForCausalLM, AutoTokenizer
-
+    import deepspeed
+    
     with config.context.init_context:
-        model = AutoModelForCausalLM.from_pretrained(config.model_path).to(config.device)
+        model = AutoModelForCausalLM.from_pretrained(config.model_path)
         tokenizer = AutoTokenizer.from_pretrained(config.model_path)
+        
+        # model_engine, optimizer, _, _ = deepspeed.initialize(
+        #     model=model,
+        #     config=args.deepspeed,
+        #     model_parameters=model.parameters()
+        # )
             
     # ================== Initialize Codebook Register ==================
     tprint("Initializing codebook register")
@@ -94,54 +110,68 @@ if __name__ == "__main__":
     tprint(f"Preparing dataset {config.dataset}")
     from datasets import load_from_disk
     from transformers import DataCollatorForLanguageModeling
+
+    raw_ds   = load_from_disk(str(config.datasets_root / config.dataset))
+    train_ds = raw_ds["train"]
+    val_ds   = raw_ds["validation"]
     
-    ds = load_from_disk(str(config.datasets_root / config.dataset)).train_test_split(test_size=0.05)
+    tokenizer.pad_token = tokenizer.eos_token
     def tokenize_fn(ex):
         return tokenizer(ex["text"],
                         truncation=True,
-                        max_length=2048,
+                        max_length=4096,
                         padding=False)
 
-    tok_ds = ds.map(tokenize_fn,
-                    batched=True,
-                    remove_columns=ds["train"].column_names)
+    train_ds = train_ds.map(tokenize_fn,
+                            batched=True,
+                            remove_columns=["text"])
+    val_ds   = val_ds.map(tokenize_fn,
+                        batched=True,
+                        remove_columns=["text"])
     collator = DataCollatorForLanguageModeling(tokenizer, mlm=False)
     
     # ================== Prepare Trainer ==================
     from transformers import Trainer, TrainingArguments
     args = TrainingArguments(
-        output_dir                 = config.save_dir,
-        bf16                       = True,          # A100 建议直接 bf16
-        per_device_train_batch_size= 2,             # 每卡 2×2048≈16 k token
-        per_device_eval_batch_size = 2,
-        gradient_accumulation_steps= 32,            # 2*32*8 ≈ 512 样本 ≈ 1 M token / step
-        learning_rate              = 2e-5,          # 全参 7B 常用区间 1e‑5 – 5e‑5
-        lr_scheduler_type          = "cosine",      # 余弦退火
-        warmup_ratio               = 0.03,
-        weight_decay               = 0.1,
-        max_grad_norm              = 1.0,
-        num_train_epochs           = 3,
-        logging_steps              = 10,
-        evaluation_strategy        = "epoch",
-        save_strategy              = "epoch",
-        save_total_limit           = 2,
-        gradient_checkpointing     = True,
-        deepspeed                  = "ds_config_zero3.json",
-        ddp_find_unused_parameters = False,
-        report_to                  = "none",
+        output_dir=config.save_dir,
+        bf16=True,                      # Keep enabled for A100
+        per_device_train_batch_size=16,   
+        per_device_eval_batch_size=64,
+        gradient_accumulation_steps=1,   
+        learning_rate=2e-5,
+        lr_scheduler_type="cosine",
+        warmup_ratio=0.03,
+        weight_decay=0.1,
+        max_grad_norm=1.0,
+        num_train_epochs=3,
+        logging_steps=1,
+        evaluation_strategy="steps",
+        eval_steps=200,                  # More frequent evaluation
+        save_strategy="epoch",
+        save_total_limit=2,
+        gradient_checkpointing=True,     # Critical for memory
+        deepspeed=args.deepspeed,
+        ddp_find_unused_parameters=False,
+        report_to="none",
+        torch_compile=True              # Enable graph optimization
     )
     
     trainer = Trainer(
         model         = model,
         args          = args,
-        train_dataset = tok_ds["train"],
-        eval_dataset  = tok_ds["test"],
+        train_dataset = train_ds,
+        eval_dataset  = val_ds,
         data_collator = collator,
     )
-    # # ================== QAT ===================
+    ## ================== QAT ===================
     tprint("Starting QAT")
+    
     with config.context.qat_context, \
         config.context.qat_codebook_register:
             trainer.train()
+            
+    # ## ================== Save Model ===================
+    # tprint("Saving model")
+    # trainer.save_model(config.save_dir)
             
             

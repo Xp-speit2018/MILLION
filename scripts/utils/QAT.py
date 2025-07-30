@@ -25,10 +25,10 @@ class PQFakeQuantFunc(torch.autograd.Function):
         # STE (Straight-Through Estimator) is used here
         return grad_output, None
 
-class PQFakeQuantModule(torch.Module):
+class PQFakeQuantModule(torch.nn.Module):
     def __init__(self, codebooks):
         super().__init__()
-        self.codebooks = torch.Parameter(codebooks, requires_grad=False) # codebooks are static during fine-tuning
+        self.codebooks = torch.nn.Parameter(codebooks, requires_grad=False) # codebooks are static during fine-tuning
 
     @torch.autocast("cuda", dtype=torch.bfloat16)
     def forward(self, x):
