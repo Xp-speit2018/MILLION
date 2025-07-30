@@ -17,8 +17,8 @@ ppl_non_merged:
 	python3 -m scripts.modeldb.main_pq \
 	-f llama-2-7b.json \
 	--dataset wikitext-2-raw-v1 \
-	-M 64 \
-	--nbits 8 \
+	-M 32 \
+	--nbits 12 \
 	--half \
 	-p sampling training evaluation
 

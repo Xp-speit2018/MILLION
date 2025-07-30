@@ -2,3 +2,8 @@
 /datasets
 /kv_samples
 /models
+
+__pycache__/
+/scripts/modeldb/bindings/build
+/scripts/modeldb/bindings/dist
+/scripts/modeldb/bindings/*.egg-info
