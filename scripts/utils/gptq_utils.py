@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from . import quarot_utils
 from . import quant_utils
+from .model_utils import get_layers
 import logging
 
 torch.backends.cuda.matmul.allow_tf32 = False
@@ -260,7 +261,9 @@ def rtn_fwrd(model, dev, args):
     TODO: Make this function general to support both OPT and LLaMA models
     '''
     assert args.w_groupsize ==-1, "Groupsize not supported in RTN!"
-    layers = model.model.layers
+
+    # layers = model.model.layers
+    layers = get_layers(model)
     torch.cuda.empty_cache()
 
     quantizers = {}

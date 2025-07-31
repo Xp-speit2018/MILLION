@@ -95,6 +95,12 @@ def get_model_type(model):
         model_type = OPT_MODEL
     elif isinstance(model, LLAMA_MODEL):
         model_type = LLAMA_MODEL
+    elif isinstance(model, GPT2_MODEL):
+        model_type = GPT2_MODEL
+    elif isinstance(model, MPT_MODEL):
+        model_type = MPT_MODEL
+    elif isinstance(model, QWEN2MOE_MODEL):
+        model_type = QWEN2MOE_MODEL
     else:
         raise ValueError(f'Unknown model type {model}')
     return model_type

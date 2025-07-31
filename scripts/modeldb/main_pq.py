@@ -18,6 +18,8 @@ from ..utils.hadamard_utils import get_hadK
 from ..utils.gptq_utils import gptq_fwrd, rtn_fwrd
 from ..utils.data_utils import get_loaders
 from ..utils.model_utils import get_model_type, LLAMA_MODEL, OPT_MODEL
+from gptqmodel import GPTQModel, QuantizeConfig
+from datasets import load_from_disk, load_dataset
 
 supported_models = [
             'meta-llama/Llama-2-7b-hf',
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p", "--pipeline",
         nargs='+',
-        choices=["quarot", "baseline", "sampling", "training", "evaluation"],
+        choices=["gptq", "baseline", "sampling", "training", "evaluation"],
         help="List of pipeline stages to execute"
     )
 
@@ -107,7 +109,7 @@ if __name__ == "__main__":
                         We do not support arguments for clipping and we find the best clip ratio during the weight quantization''')
     parser.add_argument('--nsamples', type=int, default=128,
                         help='Number of calibration data samples for GPTQ.')
-    parser.add_argument('--cal_dataset', type=str, default='wikitext2',
+    parser.add_argument('--cal_dataset', type=str, default='wikitext-2-raw-v1',
                         help='calibration data samples for GPTQ.', choices=supported_datasets)
     parser.add_argument('--percdamp', type=float, default=.01,
                         help='Percent of the average Hessian diagonal to use for dampening.')
@@ -219,13 +221,39 @@ if __name__ == "__main__":
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         with config.context.init_context:
-            model = AutoModelForCausalLM.from_pretrained(config.model_path, low_cpu_mem_usage=True).to(config.device)
+            # if "gptq" in config.pipeline and args.load_qmodel_path is None:
+            #     assert args.save_qmodel_path is not None
+            #     quant_config = QuantizeConfig(bits=args.w_bits, group_size=args.w_groupsize)
+            #     model = GPTQModel.load(config.model_path, quant_config)
+            #     model.save(args.save_qmodel_path)
+            # elif "gptq" in config.pipeline and args.load_qmodel_path is not None:
+            #     tprint(f"Loading quantized model from {args.load_qmodel_path}")
+            #     model = GPTQModel.load(args.load_qmodel_path)
+            # else:
+            quant_config = QuantizeConfig(bits=args.w_bits, group_size=args.w_groupsize)
+            model = GPTQModel.load(config.model_path, quant_config)
+            # model = AutoModelForCausalLM.from_pretrained(config.model_path, low_cpu_mem_usage=True).to(config.device)
             tokenizer = AutoTokenizer.from_pretrained(config.model_path)
             if config.half:
                 model = model.half()
             model.seqlen = config.max_length
 
-    if "quarot" in config.pipeline:
+             
+    # ================== baseline ==================
+    if "baseline" in config.pipeline:
+        tprint("Baseline")
+        from ..benchmarks import dataset2benchmark
+        benchmark = dataset2benchmark[config.dataset]
+
+        with config.context.baseline_context:
+            score_baseline = benchmark(model, tokenizer, **(config.to_dict()))
+
+        # write to jsonl
+        with open(config.root / "scripts" / "modeldb" / "results.jsonl", "a") as f:
+            f.write(json.dumps({"score": score_baseline, "model_name": config.model_name, "dataset": config.dataset, "baseline": True, "half": config.half}))
+            f.write("\n")
+
+    if "gptq" in config.pipeline:
         # Rotate the weights
         if args.rotate:
             if model_type := get_model_type(model) not in [LLAMA_MODEL, OPT_MODEL]:
@@ -252,30 +280,107 @@ if __name__ == "__main__":
                         qlayers[name].had_dim = model.config.hidden_size//model.config.num_attention_heads
                         qlayers[name].fp32_had = args.fp32_had
         else:
-            add_actquant(model) #Add Activation Wrapper to the model as the rest of the code assumes it is present
+            # add_actquant(model) #Add Activation Wrapper to the model as the rest of the code assumes it is present
+            pass
 
         if args.w_bits < 16:
             save_dict = {}
             if args.load_qmodel_path: # Load Quantized Rotated Model
-                assert args.rotate, "Model should be rotated to load a quantized model!"
+                # assert args.rotate, "Model should be rotated to load a quantized model!"
                 assert not args.save_qmodel_path, "Cannot save a quantized model if it is already loaded!"
                 print("Load quantized model from ", args.load_qmodel_path)
-                save_dict = torch.load(args.load_qmodel_path)
-                model.load_state_dict(save_dict["model"])
+                # save_dict = torch.load(args.load_qmodel_path)
+                # model.load_state_dict(save_dict["model"])
+                del model
+                # 回收GPU显存
+                cleanup_memory(verbos=False)
+                # Load the quantized model
+                tprint(f"Loading quantized model from {args.load_qmodel_path}")
+                model = GPTQModel.load(args.load_qmodel_path)
+            
                 
             elif not args.w_rtn: # GPTQ Weight Quantization
-                assert "llama" in args.model, "Only llama is supported for GPTQ!"
+                # assert "llama" in args.model, "Only llama is supported for GPTQ!"
                 
-                trainloader = get_loaders(
-                    args.cal_dataset, nsamples=args.nsamples,
-                    seed=args.seed, model=args.model,
-                    seqlen=model.seqlen, eval_mode=False
-                )
-                quantizers = gptq_fwrd(model, trainloader, DEV, args)
-                save_dict["w_quantizers"] = quantizers
+                # trainloader = get_loaders(
+                #     args.cal_dataset, nsamples=args.nsamples,
+                #     seed=args.seed, model=args.model,
+                #     seqlen=model.seqlen, eval_mode=False
+                # )
+                # quantizers = gptq_fwrd(model, trainloader, DEV, args)
+                # save_dict["w_quantizers"] = quantizers
+                # calibration_dataset = load_from_disk(
+                #     str(config.datasets_root / args.cal_dataset)
+                # )["train"].shuffle(seed=args.seed).select(range(args.nsamples))
+                
+                
+                # export HF_ENDPOINT=https://hf-mirror.com
+                # os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+
+                # 定义本地缓存路径
+                local_cache_dir = config.datasets_root / "c4_cache"
+                local_dataset_file = local_cache_dir / "c4_calibration_processed.json"
+                
+                # 检查本地文件是否存在
+                if local_dataset_file.exists():
+                    tprint(f"Loading calibration dataset from local cache: {local_dataset_file}")
+                    import json
+                    with open(local_dataset_file, 'r', encoding='utf-8') as f:
+                        calibration_dataset = json.load(f)
+                    tprint(f"Loaded {len(calibration_dataset)} samples from local cache")
+                else:
+                    tprint("Local dataset not found, downloading and processing from HuggingFace...")
+                    # 设置代理（如果需要）
+                    os.environ['http_proxy'] = 'http://127.0.0.1:26890'
+                    os.environ['https_proxy'] = 'http://127.0.0.1:26890'
+                    
+                    # 从网络加载
+                    raw_dataset = load_dataset(
+                        "allenai/c4",
+                        data_files="en/c4-train.00001-of-01024.json.gz",
+                        split="train"
+                    ).select(range(args.nsamples * 3))["text"]  # 多加载一些以防过滤后不够
+                    
+                    # 获取模型的最大序列长度
+                    max_length = getattr(model, "seqlen")
+                    tprint(f"Model max sequence length: {max_length}")
+                    
+                    # 处理和过滤文本
+                    filtered_texts = []
+                    for text in raw_dataset:
+                        # 使用 tokenizer 编码文本
+                        input_ids = tokenizer.encode(text, add_special_tokens=False)
+                        
+                        # 如果文本太长，截断它
+                        if len(input_ids) > max_length:
+                            input_ids = input_ids[:max_length]
+                            # 解码回文本
+                            text = tokenizer.decode(input_ids, skip_special_tokens=True)
+                        
+                        filtered_texts.append(text)
+                        
+                        # 收集足够的样本就停止
+                        if len(filtered_texts) >= args.nsamples:
+                            break
+                    
+                    calibration_dataset = filtered_texts
+                    tprint(f"Processed {len(calibration_dataset)} samples")
+                    
+                    # 保存到本地缓存
+                    tprint(f"Saving processed dataset to local cache: {local_dataset_file}")
+                    os.makedirs(local_cache_dir, exist_ok=True)
+                    with open(local_dataset_file, 'w', encoding='utf-8') as f:
+                        json.dump(calibration_dataset, f, ensure_ascii=False, indent=2)
+
+                # 执行量化
+                tprint(f"Starting quantization with {len(calibration_dataset)} samples...")
+                model.quantize(calibration_dataset, batch_size=1)
+                model.save(args.save_qmodel_path)
+
             else: # RTN Weight Quantization
-                quantizers = rtn_fwrd(model, DEV, args)
-                save_dict["w_quantizers"] = quantizers
+                raise NotImplementedError("RTN Weight Quantization is not implemented yet!")
+                # quantizers = rtn_fwrd(model, DEV, args)
+                # save_dict["w_quantizers"] = quantizers
                 
             if args.save_qmodel_path:
                 save_dict["model"] = model.state_dict()
@@ -314,20 +419,7 @@ if __name__ == "__main__":
                                                 groupsize=layer_groupsize,
                                                 sym=layer_a_sym,
                                                 clip_ratio=layer_a_clip)
-                
-    # ================== baseline ==================
-    if "baseline" in config.pipeline:
-        tprint("Baseline")
-        from ..benchmarks import dataset2benchmark
-        benchmark = dataset2benchmark[config.dataset]
 
-        with config.context.baseline_context:
-            score_baseline = benchmark(model, tokenizer, **(config.to_dict()))
-
-        # write to jsonl
-        with open(config.root / "scripts" / "modeldb" / "results.jsonl", "a") as f:
-            f.write(json.dumps({"score": score_baseline, "model_name": config.model_name, "dataset": config.dataset, "baseline": True, "half": config.half}))
-            f.write("\n")
 
     # ================== sampling ==================
     if "sampling" in config.pipeline and config.dataset != '_synthetic':
@@ -338,18 +430,21 @@ if __name__ == "__main__":
             tprint(f"Sampling path already exist at {config.sample_root}")
             
             while True:
-                tprint("Clear the directory(c) or exit(e)? (c/e)")
+                tprint("Recreating the exit(e), directory(r) or continue(c)? (e/r/c)")
                 char = input().strip().lower()
                 if char == 'e':
-                    tprint("Exiting...")
+                    tprint("Exit...")
                     exit()
-                elif char == 'c':
+                elif char == 'r':
                     tprint("Clearing the directory...")
                     for file in config.sample_root.glob("*"):
                         file.unlink()
                     tprint("Directory cleared.")
                     tprint(f"Recreating sampling path at {config.sample_root}")
                     os.makedirs(config.sample_root, exist_ok=True)
+                    break
+                elif char == 'c':
+                    tprint("Continuing with the existing directory...")
                     break
             
         else:
