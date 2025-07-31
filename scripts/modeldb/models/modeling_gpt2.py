@@ -53,6 +53,7 @@ def save_forward(
                 config.key_reservoir.batch_add(key[b, h].view(-1, head_size).detach().cpu())
                 config.value_reservoir.batch_add(value[b, h].view(-1, head_size).detach().cpu())
             else:
+                breakpoint()
                 config.key_reservoir[self.layer_idx].batch_add(key[b, h].view(-1, head_size).detach().cpu())
                 config.value_reservoir[self.layer_idx].batch_add(value[b, h].view(-1, head_size).detach().cpu())
 

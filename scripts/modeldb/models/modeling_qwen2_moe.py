@@ -24,6 +24,7 @@ def save_forward(
     past_key_value: Optional[Cache] = None,
     output_attentions: bool = False,
     use_cache: bool = False,
+    **qwargs
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if output_attentions:
         # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -53,9 +54,11 @@ def save_forward(
     kv_seq_len = key_states.shape[-2]
     if past_key_value is not None:
         kv_seq_len += past_key_value.get_usable_length(kv_seq_len, self.layer_idx)
-    cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    # cos, sin = self.rotary_emb(value_states, seq_len=kv_seq_len)
+    cos, sin = self.rotary_emb(value_states, position_ids)
 
-    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+
+    query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
     # Save key and value states to reservoir
     bs, nh, _, head_size = key_states.shape
@@ -118,6 +121,7 @@ def pq_forward(
     use_cache: bool = False,
     cache_position: Optional[torch.LongTensor] = None,
     position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+    **kwargs
 ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
     if output_attentions:
         # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -150,8 +154,9 @@ def pq_forward(
             torch.cuda.synchronize()
 
         with Timer("rotary_emb"):
-            cos, sin = self.rotary_emb(value_states, seq_len=key_states.shape[-2])
-            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
+            # cos, sin = self.rotary_emb(value_states, seq_len=key_states.shape[-2])
+            cos, sin = self.rotary_emb(value_states, position_ids)
+            query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
             torch.cuda.synchronize()
 
         with Timer("update_cache"):

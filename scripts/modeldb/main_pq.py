@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-p", "--pipeline",
         nargs='+',
-        choices=["gptq", "baseline", "sampling", "training", "evaluation"],
+        choices=["gptq", "baseline", "post_baseline", "sampling", "training", "evaluation"],
         help="List of pipeline stages to execute"
     )
 
@@ -238,7 +238,6 @@ if __name__ == "__main__":
                 model = model.half()
             model.seqlen = config.max_length
 
-             
     # ================== baseline ==================
     if "baseline" in config.pipeline:
         tprint("Baseline")
@@ -317,60 +316,114 @@ if __name__ == "__main__":
                 # export HF_ENDPOINT=https://hf-mirror.com
                 # os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
-                # 定义本地缓存路径
-                local_cache_dir = config.datasets_root / "c4_cache"
-                local_dataset_file = local_cache_dir / "c4_calibration_processed.json"
+                # 定义原始数据缓存路径
+                raw_cache_dir = config.datasets_root / "c4_raw"
+                raw_dataset_file = raw_cache_dir / "c4-train.00001-of-01024.json"
                 
-                # 检查本地文件是否存在
-                if local_dataset_file.exists():
-                    tprint(f"Loading calibration dataset from local cache: {local_dataset_file}")
+                # 定义处理后数据缓存路径（根据模型seqlen区分）
+                model_seqlen = getattr(model, "seqlen")
+                processed_cache_dir = config.datasets_root / "c4_processed" / f"seqlen_{model_seqlen}"
+                processed_dataset_file = processed_cache_dir / f"c4_calibration_{args.nsamples}_samples.json"
+                
+                # 检查处理后的数据是否存在
+                if processed_dataset_file.exists():
+                    tprint(f"Loading processed calibration dataset from cache: {processed_dataset_file}")
                     import json
-                    with open(local_dataset_file, 'r', encoding='utf-8') as f:
+                    with open(processed_dataset_file, 'r', encoding='utf-8') as f:
                         calibration_dataset = json.load(f)
-                    tprint(f"Loaded {len(calibration_dataset)} samples from local cache")
+                    tprint(f"Loaded {len(calibration_dataset)} samples from processed cache (seqlen={model_seqlen})")
                 else:
-                    tprint("Local dataset not found, downloading and processing from HuggingFace...")
-                    # 设置代理（如果需要）
-                    os.environ['http_proxy'] = 'http://127.0.0.1:26890'
-                    os.environ['https_proxy'] = 'http://127.0.0.1:26890'
+                    # 检查原始数据是否存在
+                    if raw_dataset_file.exists():
+                        tprint(f"Loading raw dataset from local cache: {raw_dataset_file}")
+                        import json
+                        raw_texts = []
+                        with open(raw_dataset_file, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                if line.strip():
+                                    item = json.loads(line.strip())
+                                    raw_texts.append(item["text"])
+                                    if len(raw_texts) >= args.nsamples * 3:  # 多加载一些以防过滤后不够
+                                        break
+                    else:
+                        tprint("Raw dataset not found, downloading from HuggingFace...")
+                        # 设置代理（如果需要）
+                        os.environ['http_proxy'] = 'http://127.0.0.1:26890'
+                        os.environ['https_proxy'] = 'http://127.0.0.1:26890'
+                        
+                        # 从网络加载原始数据
+                        raw_dataset = load_dataset(
+                            "allenai/c4",
+                            data_files="en/c4-train.00001-of-01024.json.gz",
+                            split="train"
+                        ).select(range(args.nsamples * 5))  # 多加载一些原始数据
+                        
+                        raw_texts = raw_dataset["text"]
+                        
+                        # 保存原始数据到本地
+                        tprint(f"Saving raw dataset to local cache: {raw_dataset_file}")
+                        os.makedirs(raw_cache_dir, exist_ok=True)
+                        with open(raw_dataset_file, 'w', encoding='utf-8') as f:
+                            for text in raw_texts:
+                                json.dump({"text": text}, f, ensure_ascii=False)
+                                f.write('\n')
                     
-                    # 从网络加载
-                    raw_dataset = load_dataset(
-                        "allenai/c4",
-                        data_files="en/c4-train.00001-of-01024.json.gz",
-                        split="train"
-                    ).select(range(args.nsamples * 3))["text"]  # 多加载一些以防过滤后不够
-                    
-                    # 获取模型的最大序列长度
-                    max_length = getattr(model, "seqlen")
-                    tprint(f"Model max sequence length: {max_length}")
+                    # 根据当前模型的seqlen处理数据
+                    tprint(f"Processing dataset for model seqlen: {model_seqlen}")
                     
                     # 处理和过滤文本
                     filtered_texts = []
-                    for text in raw_dataset:
+                    for text in raw_texts:
+                        if text is None or text.strip() == "":
+                            continue
+                            
                         # 使用 tokenizer 编码文本
                         input_ids = tokenizer.encode(text, add_special_tokens=False)
                         
                         # 如果文本太长，截断它
-                        if len(input_ids) > max_length:
-                            input_ids = input_ids[:max_length]
+                        if len(input_ids) > model_seqlen:
+                            input_ids = input_ids[:model_seqlen]
                             # 解码回文本
                             text = tokenizer.decode(input_ids, skip_special_tokens=True)
                         
-                        filtered_texts.append(text)
+                        # 确保文本不为空且有一定长度
+                        if text.strip() and len(tokenizer.encode(text, add_special_tokens=False)) > 10:
+                            filtered_texts.append(text.strip())
                         
                         # 收集足够的样本就停止
                         if len(filtered_texts) >= args.nsamples:
                             break
                     
                     calibration_dataset = filtered_texts
-                    tprint(f"Processed {len(calibration_dataset)} samples")
+                    tprint(f"Processed {len(calibration_dataset)} samples for seqlen={model_seqlen}")
                     
-                    # 保存到本地缓存
-                    tprint(f"Saving processed dataset to local cache: {local_dataset_file}")
-                    os.makedirs(local_cache_dir, exist_ok=True)
-                    with open(local_dataset_file, 'w', encoding='utf-8') as f:
+                    # 保存处理后的数据到本地缓存
+                    tprint(f"Saving processed dataset to cache: {processed_dataset_file}")
+                    os.makedirs(processed_cache_dir, exist_ok=True)
+                    with open(processed_dataset_file, 'w', encoding='utf-8') as f:
                         json.dump(calibration_dataset, f, ensure_ascii=False, indent=2)
+
+                # 验证数据集
+                if not calibration_dataset or len(calibration_dataset) == 0:
+                    raise ValueError("Calibration dataset is empty!")
+                
+                # 最终验证每个样本的长度
+                valid_samples = []
+                for sample in calibration_dataset:
+                    if isinstance(sample, str) and sample.strip():
+                        # 再次检查token长度
+                        tokens = tokenizer.encode(sample, add_special_tokens=False)
+                        if len(tokens) <= model_seqlen:
+                            valid_samples.append(sample.strip())
+                
+                if len(valid_samples) == 0:
+                    raise ValueError("No valid samples found after length validation!")
+                else:
+                    tprint(f"Filtered down to {len(valid_samples)} valid samples after length validation.")
+                
+                calibration_dataset = valid_samples[:args.nsamples]
+                tprint(f"Final calibration dataset: {len(calibration_dataset)} samples, max_seqlen={model_seqlen}")
+
 
                 # 执行量化
                 tprint(f"Starting quantization with {len(calibration_dataset)} samples...")
@@ -421,7 +474,19 @@ if __name__ == "__main__":
                                                 groupsize=layer_groupsize,
                                                 sym=layer_a_sym,
                                                 clip_ratio=layer_a_clip)
+    # ================== baseline ==================
+    if "post_baseline" in config.pipeline:
+        tprint("post_Baseline")
+        from ..benchmarks import dataset2benchmark
+        benchmark = dataset2benchmark[config.dataset]
 
+        with config.context.baseline_context:
+            score_baseline = benchmark(model, tokenizer, **(config.to_dict()))
+
+        # write to jsonl
+        with open(config.root / "scripts" / "modeldb" / "results.jsonl", "a") as f:
+            f.write(json.dumps({"score": score_baseline, "model_name": config.model_name, "dataset": config.dataset, "post_baseline": True, "half": config.half}))
+            f.write("\n")
 
     # ================== sampling ==================
     if "sampling" in config.pipeline and config.dataset != '_synthetic':

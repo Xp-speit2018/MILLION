@@ -1,2 +1,0 @@
-
-{"score": 7.965825080871582, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}

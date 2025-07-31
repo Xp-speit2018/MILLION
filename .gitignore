@@ -8,3 +8,5 @@ __pycache__/
 /scripts/modeldb/bindings/build
 /scripts/modeldb/bindings/dist
 /scripts/modeldb/bindings/*.egg-info
+
+gptq_log*

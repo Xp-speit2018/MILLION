@@ -1,3 +1,15 @@
+model ?= llama-2-7b				# 'llama-2-7b', 'llama-2-13b', 'gpt2-xl', 'mpt-7b', 'qwen1.5-moe-a2.7b'
+dataset ?= wikitext-2-raw-v1	# 'wikitext-2-raw-v1' or 'ptb-text-only'
+
+ifeq ($(model),gpt2-xl)
+	M=32
+else
+	M=64
+endif
+
+.DEFAULT_GOAL := PPL_W4A8GPTQ_KVPQ4
+
+
 bindings:
 	cd ./scripts/modeldb/bindings && \
 	python3 setup.py install && \
@@ -22,6 +34,16 @@ ppl_non_merged:
 	--half \
 	-p sampling training evaluation
 
+PPL_W4A8GPTQ_KVPQ4:
+	python3 -m scripts.modeldb.main_pq \
+	-f $(model).json \
+	--dataset $(dataset) \
+	-M $(M) \
+	--nbits 8 \
+	--half \
+	-p baseline gptq sampling training evaluation \
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
+
 llama2_7b:
 	python3 -m scripts.modeldb.main_pq \
 	-f llama-2-7b.json \
@@ -29,8 +51,8 @@ llama2_7b:
 	-M 64 \
 	--nbits 8 \
 	--half \
-	-p  baseline gptq sampling training evaluation \
-	--model meta-llama/Llama-2-7b-hf --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/llama-2-7b-q-gptq.pth"
+	-p gptq sampling training evaluation \
+	--model meta-llama/Llama-2-7b-hf --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/llama-2-7b-q-gptq.pth"
 
 llama2_13b:
 	python3 -m scripts.modeldb.main_pq \
@@ -40,7 +62,7 @@ llama2_13b:
 	--nbits 8 \
 	--half \
 	-p baseline gptq sampling training evaluation \
-	--model "./models/llama-2-13b-hf" --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/llama-2-13b-q-gptq.pth"
+	--model "./models/llama-2-13b-hf" --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/llama-2-13b-q-gptq.pth"
 	# -p baseline sampling training evaluation
 
 gpt2:
@@ -50,7 +72,7 @@ gpt2:
 	-M 32 \
 	--nbits 8 \
 	--half \
-	-p baseline gptq sampling training evaluation \
+	-p baseline gptq \
 	--model "./models/gpt2-xl" --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/gpt2-xl-gptq.pth"
 
 mpt:
