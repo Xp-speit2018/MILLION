@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser.add_argument('--w_clip', action=argparse.BooleanOptionalAction, default=False,
                         help='''Clipping the weight quantization! 
                         We do not support arguments for clipping and we find the best clip ratio during the weight quantization''')
-    parser.add_argument('--nsamples', type=int, default=128,
+    parser.add_argument('--nsamples', type=int, default=256,
                         help='Number of calibration data samples for GPTQ.')
     parser.add_argument('--cal_dataset', type=str, default='wikitext-2-raw-v1',
                         help='calibration data samples for GPTQ.', choices=supported_datasets)
@@ -374,18 +374,20 @@ if __name__ == "__main__":
 
                 # 执行量化
                 tprint(f"Starting quantization with {len(calibration_dataset)} samples...")
-                model.quantize(calibration_dataset, batch_size=1)
-                model.save(args.save_qmodel_path)
+                model.quantize(calibration_dataset, batch_size=4)
+                if args.save_qmodel_path:
+                    model.save(args.save_qmodel_path)
 
             else: # RTN Weight Quantization
                 raise NotImplementedError("RTN Weight Quantization is not implemented yet!")
                 # quantizers = rtn_fwrd(model, DEV, args)
                 # save_dict["w_quantizers"] = quantizers
                 
-            if args.save_qmodel_path:
-                save_dict["model"] = model.state_dict()
-                torch.save(save_dict, args.save_qmodel_path)
+            # if args.save_qmodel_path:
+            #     save_dict["model"] = model.state_dict()
+            #     torch.save(save_dict, args.save_qmodel_path)
 
+        add_actquant(model) #Add Activation Wrapper to the model as the rest of the code assumes it is present
 
         # Add Input Quantization
         if args.a_bits < 16 or args.v_bits < 16:
