@@ -246,7 +246,7 @@ def gptq_fwrd(model, dataloader, dev, args):
         inps, outs = outs, inps
 
     model.config.use_cache = use_cache
-    utils.cleanup_memory(verbos=True)
+    quarot_utils.cleanup_memory(verbos=True)
     logging.info('-----GPTQ Quantization Done-----\n')
     return quantizers
 
