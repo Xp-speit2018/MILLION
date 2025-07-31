@@ -5,7 +5,7 @@ from ..utils.Timer import tprint
 from ..utils.Namespace import UniConfig
 
 def preprocess_dataset(dataset_name, root=None):
-    supported = ['wikitext-2-raw-v1', 'wikitext-103-v1', 'ptb_text_only', 'wikitext-103-raw-v1']
+    supported = ['wikitext-2-raw-v1', 'wikitext-103-v1', 'ptb-text-only', 'wikitext-103-raw-v1']
     if dataset_name not in supported:
         raise ValueError('Dataset not supported')
     
@@ -57,7 +57,7 @@ def perplexity(model, tokenizer, *, dataset, datasets_root, device, max_length, 
             cache_clear_func()
         with torch.no_grad():
             outputs = model(input_ids, labels=target_ids)
-            nll = outputs.loss
+            nll = outputs.loss.to(torch.float32)
         
         nlls.append(nll * trg_len)
         total_length += trg_len
