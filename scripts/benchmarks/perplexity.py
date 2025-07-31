@@ -10,8 +10,11 @@ def preprocess_dataset(dataset_name, root=None):
         raise ValueError('Dataset not supported')
     
     split = 'test'
-    dataset = load_from_disk(str(root / dataset_name))[split]
-    if dataset_name == 'ptb_text_only':
+    if dataset_name == 'wikitext-2-raw-v1':
+        dataset = load_from_disk(str(root / dataset_name))[split]
+    elif dataset_name == 'ptb-text-only':
+        dataset = load_from_disk(str(root / 'PTB'))[split]
+    # if dataset_name == 'ptb_text_only':
         dataset = dataset.rename_column('sentence', 'text')
     return dataset
 
