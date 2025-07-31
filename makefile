@@ -22,15 +22,15 @@ ppl_non_merged:
 	--half \
 	-p sampling training evaluation
 
-quant_llama2:
+llama2_7b:
 	python3 -m scripts.modeldb.main_pq \
 	-f llama-2-7b.json \
 	--dataset wikitext-2-raw-v1 \
 	-M 64 \
 	--nbits 8 \
 	--half \
-	-p quarot baseline training evaluation \
-	--model meta-llama/Llama-2-7b-hf --rotate --a_bits 4 --w_bits 4 --w_clip --w_rtn --save_qmodel_path "./qmodels/llama-2-7b-q-gptq.pth"
+	-p  baseline gptq sampling training evaluation \
+	--model meta-llama/Llama-2-7b-hf --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/llama-2-7b-q-gptq.pth"
 
 llama2_13b:
 	python3 -m scripts.modeldb.main_pq \
@@ -39,7 +39,7 @@ llama2_13b:
 	-M 64 \
 	--nbits 8 \
 	--half \
-	-p gptq sampling training evaluation \
+	-p baseline gptq sampling training evaluation \
 	--model "./models/llama-2-13b-hf" --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/llama-2-13b-q-gptq.pth"
 	# -p baseline sampling training evaluation
 
@@ -50,7 +50,7 @@ gpt2:
 	-M 32 \
 	--nbits 8 \
 	--half \
-	-p gptq sampling training evaluation \
+	-p baseline gptq sampling training evaluation \
 	--model "./models/gpt2-xl" --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/gpt2-xl-gptq.pth"
 
 mpt:
@@ -60,7 +60,7 @@ mpt:
 	-M 64 \
 	--nbits 8 \
 	--half \
-	-p gptq sampling training evaluation \
+	-p baseline gptq sampling training evaluation \
 	--model "./models/mpt-7b" --a_bits 4 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/mpt-7b-gptq.pth"
 
 qwen_moe:
