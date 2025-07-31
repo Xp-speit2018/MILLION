@@ -1,0 +1,10 @@
+{
+    "model_name" : "qwen1.5-moe-a2.7b",
+    "max_length" : 8192,
+    "stride" : 8192,
+    "d" : 128,
+    "n_heads" : 16,
+    "n_layers" : 24,
+    "folder" : "Qwen1.5-MoE-A2.7B",
+    "head_dim" : 128
+}

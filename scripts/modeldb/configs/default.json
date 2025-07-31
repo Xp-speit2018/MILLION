@@ -9,7 +9,7 @@
     "M" : 16,
     "nbits" : 10,
 
-    "dataset" : "PTB",
+    "dataset" : "ptb-text-only",
     "merged_training" : false,
     "pipeline" : [
         "sampling", "training", "evaluation"

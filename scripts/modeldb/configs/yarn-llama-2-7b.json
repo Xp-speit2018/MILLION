@@ -5,5 +5,6 @@
     "d" : 128,
     "n_heads" : 32,
     "n_layers" : 32,
-    "folder" : "Yarn-Llama-2-7b-128k"
+    "folder" : "Yarn-Llama-2-7b-128k",
+    "head_dim" : 128
 }

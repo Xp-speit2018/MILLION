@@ -1,0 +1,10 @@
+{
+    "model_name" : "gpt2-xl",
+    "max_length" : 1024,
+    "stride" : 1024,
+    "d" : 64,
+    "n_heads" : 25,
+    "n_layers" : 48,
+    "folder" : "gpt2-xl",
+    "head_dim" : 64
+}
