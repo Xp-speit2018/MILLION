@@ -51,6 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--opq", action="store_true", help="Prepand LT before PQ to maximize squred error across dimensions", required=False)
     parser.add_argument("--seed", type=int, help="Random seed", required=False, default=42)
     parser.add_argument("--half", action="store_true", help="Use half precision", required=False)
+    parser.add_argument("--device", type=str, default="cuda:0", help="Device to use for training and evaluation", required=False)
     parser.add_argument("--breakdown", action="store_true", help="Breakdown timing, could lead to overhead due to additional torch.cuda.synchronize", required=False)
     parser.add_argument(
         "-p", "--pipeline",
@@ -155,7 +156,7 @@ if __name__ == "__main__":
     #     raise NotImplementedError("Only merged training is supported😈. Use --merged_training")
     # ================== Config ==================
     config = UniConfig()
-    config.device = 'cuda' # TODO: support multi-gpu
+    config.device = args.device 
 
     config.root = pathlib.Path(__file__).parent.parent.parent
     config.config_root = config.root / "scripts" / "modeldb" / "configs"
@@ -218,7 +219,7 @@ if __name__ == "__main__":
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         with config.context.init_context:
-            model = AutoModelForCausalLM.from_pretrained(config.model_path).to(config.device)
+            model = AutoModelForCausalLM.from_pretrained(config.model_path, low_cpu_mem_usage=True).to(config.device)
             tokenizer = AutoTokenizer.from_pretrained(config.model_path)
             if config.half:
                 model = model.half()
@@ -360,19 +361,18 @@ if __name__ == "__main__":
         from ..benchmarks import dataset2benchmark
         from ..utils.Reservoir import Reservoir
         benchmark = dataset2benchmark[config.dataset]
-        head_size = config.model_config.hidden_size // config.model_config.num_key_value_heads
         if config.merged_training is True:
             config.key_reservoir = Reservoir(
                 max_size = 256 * 2**config.nbits,
                 device = "cpu", # use CPU for reservoir to avoid GPU memory issues
-                dim = head_size,
+                dim = config.head_dim,
                 dtype = model.dtype,
                 name = f"{config.model_name}_{config.dataset}_merged"
             )
             config.value_reservoir = Reservoir(
                 max_size = 256 * 2**config.nbits,
                 device = "cpu",
-                dim = head_size,
+                dim = config.head_dim,
                 dtype = model.dtype,
                 name = f"{config.model_name}_{config.dataset}_merged"
             )
@@ -381,19 +381,19 @@ if __name__ == "__main__":
                 Reservoir(
                     max_size = 256 * 2**config.nbits,
                     device = "cpu",
-                    dim = head_size,
+                    dim = config.head_dim,
                     dtype = model.dtype,
                     name = f"{config.model_name}_{config.dataset}_layer{layer_idx}"
-                ) for layer_idx in range(config.model_config.num_hidden_layers)
+                ) for layer_idx in range(config.n_layers)
             ]
             config.value_reservoir = [
                 Reservoir(
                     max_size = 256 * 2**config.nbits,
                     device = "cpu",
-                    dim = head_size,
+                    dim = config.head_dim,
                     dtype = model.dtype,
                     name = f"{config.model_name}_{config.dataset}_layer{layer_idx}"
-                ) for layer_idx in range(config.model_config.num_hidden_layers)
+                ) for layer_idx in range(config.n_layers)
             ]
                 
         with config.context.sampling_context:
@@ -412,7 +412,7 @@ if __name__ == "__main__":
             tprint(f"Reservoirs saved to {key_reservoir_path} and {value_reservoir_path}")
             del config.key_reservoir, config.value_reservoir
         else:
-            for layer_idx in range(config.model_config.num_hidden_layers):
+            for layer_idx in range(config.n_layers):
                 key_reservoir_path = config.sample_root / f'key_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs'
                 value_reservoir_path = config.sample_root / f'value_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs'
                 write_fvecs(key_reservoir_path, config.key_reservoir[layer_idx].reservoir[:config.key_reservoir[layer_idx].count].cpu().numpy())
@@ -442,7 +442,7 @@ if __name__ == "__main__":
             save(val_cent, config.cent_root / f'val_cent_{config.M}_{config.nbits}.pq.pt')
             del val, val_cent
         else:
-            for layer_idx in tqdm(range(config.model_config.num_hidden_layers), desc="Training PQ for each layer"):
+            for layer_idx in tqdm(range(config.n_layers), desc="Training PQ for each layer"):
                 key = read_fvecs(config.sample_root / f'key_sampled_{config.M}_{config.nbits}_layer{layer_idx}.fvecs')
                 key_cent = train_pq(key, config.M, config.nbits)
                 save(key_cent, config.cent_root / f'key_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt')
@@ -465,8 +465,8 @@ if __name__ == "__main__":
                 key_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
                 val_cent = torch.randn(config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
             else:
-                key_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
-                val_cent = torch.randn(config.model_config.num_hidden_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+                key_cent = torch.randn(config.n_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
+                val_cent = torch.randn(config.n_layers, config.M, 2**config.nbits, config.d // config.M, dtype=model.dtype, device=config.device)
         else:
             if config.merged_training is True:
                 tprint("Using merged centroids")
@@ -478,7 +478,7 @@ if __name__ == "__main__":
                 tprint("Using per-layer centroids")
                 key_cent = []
                 val_cent = []
-                for layer_idx in range(config.model_config.num_hidden_layers):
+                for layer_idx in range(config.n_layers):
                     key_cent.append(torch.load(config.cent_root / f'key_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt', weights_only=True))
                     key_cent[-1] = key_cent[-1].to(config.device).to(model.dtype)
                     val_cent.append(torch.load(config.cent_root / f'val_cent_{config.M}_{config.nbits}_layer{layer_idx}.pq.pt', weights_only=True))
@@ -489,11 +489,11 @@ if __name__ == "__main__":
 
         from ..utils.pq_utils import DynamicPQCache
         cache = DynamicPQCache(
-            bs = 1, # TODO: support batch size?
-            num_key_value_heads=config.model_config.num_key_value_heads,
-            nh = config.model_config.num_attention_heads,
+            bs = 1,
+            num_key_value_heads=config.n_heads,
+            nh = config.n_heads, # TODO: adjust for gqa
             M = config.M,
-            layer_num=config.model_config.num_hidden_layers,
+            layer_num=config.n_layers,
             dtype=config.cache_dtype,
             nbits=config.nbits,
             d=config.d,

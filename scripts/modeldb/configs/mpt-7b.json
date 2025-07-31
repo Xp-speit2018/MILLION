@@ -1,0 +1,10 @@
+{
+    "model_name" : "mpt-7b",
+    "max_length" : 2048,
+    "stride" : 2048,
+    "d" : 128,
+    "n_heads" : 32,
+    "n_layers" : 32,
+    "folder" : "mpt-7b",
+    "head_dim" : 128
+}

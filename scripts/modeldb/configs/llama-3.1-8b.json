@@ -5,5 +5,6 @@
     "d" : 128,
     "n_heads" : 32,
     "n_layers" : 32,
-    "folder" : "Meta-Llama-3.1-8B-hf"
+    "folder" : "Meta-Llama-3.1-8B-hf",
+    "head_dim" : 128
 }
