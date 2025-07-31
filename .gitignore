@@ -2,6 +2,7 @@
 /datasets
 /kv_samples
 /models
+/qmodels
 
 __pycache__/
 /scripts/modeldb/bindings/build
