@@ -9,7 +9,7 @@ else
 	M=64
 endif
 
-.DEFAULT_GOAL := PPL_W4A8GPTQ_KVPQ4_ptb
+.DEFAULT_GOAL := PPL_W8A8GPTQ_KVPQ4_ptb
 
 
 bindings:
@@ -46,7 +46,7 @@ PPL_W4A8GPTQ_KVPQ4:
 	-p baseline gptq post_baseline sampling training evaluation \
 	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4-ptb.pth"
 
-PPL_W4A8GPTQ_KVPQ4_wiki:
+PPL_W8A8GPTQ_KVPQ4_wiki:
 	python3 -m scripts.modeldb.main_pq \
 	-f $(model).json \
 	--dataset wikitext-2-raw-v1 \
@@ -54,11 +54,11 @@ PPL_W4A8GPTQ_KVPQ4_wiki:
 	--nbits 8 \
 	--half \
 	-p baseline gptq post_baseline sampling training evaluation \
-	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 8 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
 
 
 
-PPL_W4A8GPTQ_KVPQ4_ptb: PPL_W4A8GPTQ_KVPQ4_wiki
+PPL_W8A8GPTQ_KVPQ4_ptb: PPL_W8A8GPTQ_KVPQ4_wiki
 	python3 -m scripts.modeldb.main_pq \
 	-f $(model).json \
 	--dataset ptb-text-only \
@@ -66,7 +66,7 @@ PPL_W4A8GPTQ_KVPQ4_ptb: PPL_W4A8GPTQ_KVPQ4_wiki
 	--nbits 8 \
 	--half \
 	-p baseline gptq post_baseline sampling training evaluation \
-	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 8 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
 
 
 
