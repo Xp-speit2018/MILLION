@@ -1,0 +1,30 @@
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 144878.359375, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 148653.765625, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 9.98236083984375, "model_name": "mpt-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 7.683091640472412, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 144833.609375, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 7.683091640472412, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 381746.25, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 381724.78125, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 7.882360458374023, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 8.201048851013184, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 9.98236083984375, "model_name": "mpt-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 97082.3125, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 95657.2578125, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 9.98236083984375, "model_name": "mpt-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 165539.3125, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 8.710444450378418, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 9.081151962280273, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 9.98236083984375, "model_name": "mpt-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 7.682812690734863, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 7.882360458374023, "model_name": "mpt-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 8.198017120361328, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 9.98236083984375, "model_name": "mpt-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 10.208916664123535, "model_name": "mpt-7b", "dataset": "ptb-text-only", "post_baseline": true, "half": true}
+{"score": 10.614373207092285, "device": "cuda:0", "model_name": "mpt-7b", "max_length": 2048, "stride": 2048, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "ptb-text-only", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "mpt-7b", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
