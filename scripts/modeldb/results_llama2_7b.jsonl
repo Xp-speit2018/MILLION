@@ -1,0 +1,37 @@
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": NaN, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.296968936920166, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.300551414489746, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": NaN, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": NaN, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "post_baseline": true, "half": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": NaN, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.323668479919434, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.571755409240723, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 1707.0443115234375, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "post_baseline": true, "half": true}
+{"score": 888.3397827148438, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "ptb-text-only", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 5.116330146789551, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "baseline": true, "half": true}
+{"score": 5.264895915985107, "model_name": "llama-2-7b", "dataset": "wikitext-2-raw-v1", "post_baseline": true, "half": true}
+{"score": 5.4729814529418945, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "wikitext-2-raw-v1", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
+{"score": 28.299833297729492, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "baseline": true, "half": true}
+{"score": 371.0591125488281, "model_name": "llama-2-7b", "dataset": "ptb-text-only", "post_baseline": true, "half": true}
+{"score": 216.62611389160156, "device": "cuda:0", "model_name": "llama-2-7b", "max_length": 4096, "stride": 4096, "sampling_rate": 1, "d": 128, "M": 64, "nbits": 8, "dataset": "ptb-text-only", "merged_training": false, "pipeline": ["baseline", "gptq", "post_baseline", "sampling", "training", "evaluation"], "source": "restore", "seed": 42, "n_heads": 32, "n_layers": 32, "folder": "llama-2-7b-hf", "head_dim": 128, "half": true, "breakdown": false, "opq": false, "distort_recent": true}
