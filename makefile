@@ -1,5 +1,7 @@
-model ?= llama-2-7b				# 'llama-2-7b', 'llama-2-13b', 'gpt2-xl', 'mpt-7b', 'qwen1.5-moe-a2.7b'
-dataset ?= wikitext-2-raw-v1	# 'wikitext-2-raw-v1' or 'ptb-text-only'
+# 'llama-2-7b', 'llama-2-13b', 'gpt2-xl', 'mpt-7b', 'qwen1.5-moe-a2.7b'
+model ?= llama-2-7b
+# 'wikitext-2-raw-v1' or 'ptb-text-only'
+dataset ?= wikitext-2-raw-v1
 
 ifeq ($(model),gpt2-xl)
 	M=32

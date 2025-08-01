@@ -234,6 +234,11 @@ if __name__ == "__main__":
             model = GPTQModel.load(config.model_path, quant_config)
             # model = AutoModelForCausalLM.from_pretrained(config.model_path, low_cpu_mem_usage=True).to(config.device)
             tokenizer = AutoTokenizer.from_pretrained(config.model_path)
+            if tokenizer.pad_token is None:
+                if tokenizer.eos_token is not None:
+                    tokenizer.pad_token = tokenizer.eos_token
+                else:
+                    tokenizer.add_special_tokens({'pad_token': '[PAD]'})            
             if config.half:
                 model = model.half()
             model.seqlen = config.max_length
@@ -343,7 +348,7 @@ if __name__ == "__main__":
                                 if line.strip():
                                     item = json.loads(line.strip())
                                     raw_texts.append(item["text"])
-                                    if len(raw_texts) >= args.nsamples * 3:  # 多加载一些以防过滤后不够
+                                    if len(raw_texts) >= args.nsamples * 100:  # 多加载一些以防过滤后不够
                                         break
                     else:
                         tprint("Raw dataset not found, downloading from HuggingFace...")
@@ -351,12 +356,12 @@ if __name__ == "__main__":
                         os.environ['http_proxy'] = 'http://127.0.0.1:26890'
                         os.environ['https_proxy'] = 'http://127.0.0.1:26890'
                         
-                        # 从网络加载原始数据
+                        # 从网络加载原始数据（不做select，保存全部）
                         raw_dataset = load_dataset(
                             "allenai/c4",
                             data_files="en/c4-train.00001-of-01024.json.gz",
                             split="train"
-                        ).select(range(args.nsamples * 5))  # 多加载一些原始数据
+                        )
                         
                         raw_texts = raw_dataset["text"]
                         
@@ -372,7 +377,8 @@ if __name__ == "__main__":
                     tprint(f"Processing dataset for model seqlen: {model_seqlen}")
                     
                     # 处理和过滤文本
-                    filtered_texts = []
+                    # filtered_texts = []
+                    calibration_dataset = []
                     for text in raw_texts:
                         if text is None or text.strip() == "":
                             continue
@@ -383,18 +389,22 @@ if __name__ == "__main__":
                         # 如果文本太长，截断它
                         if len(input_ids) > model_seqlen:
                             input_ids = input_ids[:model_seqlen]
+                            calibration_dataset.append(input_ids)
+                        elif len(input_ids) > model_seqlen*0.8:
+                            input_ids = tokenizer.encode(text, add_special_tokens=False, truncation=True, max_length=model_seqlen, padding='max_length')
+                            calibration_dataset.append(input_ids)
                             # 解码回文本
-                            text = tokenizer.decode(input_ids, skip_special_tokens=True)
+                            # text = tokenizer.decode(input_ids, skip_special_tokens=True)
                         
                         # 确保文本不为空且有一定长度
-                        if text.strip() and len(tokenizer.encode(text, add_special_tokens=False)) > 10:
-                            filtered_texts.append(text.strip())
+                        # if text.strip() and len(tokenizer.encode(text, add_special_tokens=False)) > 10:
+                        #     filtered_texts.append(text.strip())
                         
                         # 收集足够的样本就停止
-                        if len(filtered_texts) >= args.nsamples:
+                        if len(calibration_dataset) >= args.nsamples:
                             break
                     
-                    calibration_dataset = filtered_texts
+                    # calibration_dataset = filtered_texts
                     tprint(f"Processed {len(calibration_dataset)} samples for seqlen={model_seqlen}")
                     
                     # 保存处理后的数据到本地缓存
@@ -403,25 +413,25 @@ if __name__ == "__main__":
                     with open(processed_dataset_file, 'w', encoding='utf-8') as f:
                         json.dump(calibration_dataset, f, ensure_ascii=False, indent=2)
 
-                # 验证数据集
-                if not calibration_dataset or len(calibration_dataset) == 0:
-                    raise ValueError("Calibration dataset is empty!")
-                
-                # 最终验证每个样本的长度
-                valid_samples = []
-                for sample in calibration_dataset:
-                    if isinstance(sample, str) and sample.strip():
-                        # 再次检查token长度
-                        tokens = tokenizer.encode(sample, add_special_tokens=False)
-                        if len(tokens) <= model_seqlen:
-                            valid_samples.append(sample.strip())
-                
-                if len(valid_samples) == 0:
-                    raise ValueError("No valid samples found after length validation!")
-                else:
-                    tprint(f"Filtered down to {len(valid_samples)} valid samples after length validation.")
-                
-                calibration_dataset = valid_samples[:args.nsamples]
+                # # 验证数据集
+                # if not calibration_dataset or len(calibration_dataset) == 0:
+                #     raise ValueError("Calibration dataset is empty!")
+                # 
+                # # 最终验证每个样本的长度
+                # valid_samples = []
+                # for sample in calibration_dataset:
+                #     if isinstance(sample, str) and sample.strip():
+                #         # 再次检查token长度
+                #         tokens = tokenizer.encode(sample, add_special_tokens=False)
+                #         if len(tokens) <= model_seqlen:
+                #             valid_samples.append(sample.strip())
+                # 
+                # if len(valid_samples) == 0:
+                #     raise ValueError("No valid samples found after length validation!")
+                # else:
+                #     tprint(f"Filtered down to {len(valid_samples)} valid samples after length validation.")
+                # 
+                # calibration_dataset = valid_samples[:args.nsamples]
                 tprint(f"Final calibration dataset: {len(calibration_dataset)} samples, max_seqlen={model_seqlen}")
 
 
