@@ -44,7 +44,8 @@ PPL_W4A8GPTQ_KVPQ4:
 	--nbits 8 \
 	--half \
 	-p baseline gptq post_baseline sampling training evaluation \
-	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4-ptb.pth"
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 
+	# --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4-ptb.pth"
 
 PPL_W8A8GPTQ_KVPQ4_wiki:
 	python3 -m scripts.modeldb.main_pq \
@@ -54,7 +55,8 @@ PPL_W8A8GPTQ_KVPQ4_wiki:
 	--nbits 8 \
 	--half \
 	-p baseline gptq post_baseline sampling training evaluation \
-	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 8 --w_groupsize 128 --w_clip --save_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 
+	# --w_clip --save_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
 
 
 
@@ -66,7 +68,8 @@ PPL_W8A8GPTQ_KVPQ4_ptb: PPL_W8A8GPTQ_KVPQ4_wiki
 	--nbits 8 \
 	--half \
 	-p baseline gptq post_baseline sampling training evaluation \
-	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 8 --w_groupsize 128 --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
+	--model $(model) --a_bits 8 --a_groupsize 128 --w_bits 4 --w_groupsize 128 
+	# --w_clip --load_qmodel_path "./qmodels/$(model)-gptq-w4.pth"
 
 
 
